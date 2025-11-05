@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>sozvon</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="background-gradient"></div>
+    
+    <div id="loadingScreen" class="loading-screen active">
+        <div class="loading-container">
+            <div class="symbol-animation" id="symbolAnimation"></div>
+            <div class="loading-text" id="loadingText">Hello!</div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div id="welcomeScreen" class="screen active">
+            <div class="glass-card">
+                <div class="logo">
+                    <h1>sozvon</h1>
+                    <button class="info-btn" id="infoBtn" title="Почему анонимно?">?</button>
+                </div>
+                
+                <div class="input-group">
+                    <input type="text" id="roomInput" placeholder="Введите код комнаты" autocomplete="off">
+                    <button id="joinBtn" class="btn-join">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M5 12h14M12 5l7 7-7 7"/>
+                        </svg>
+                    </button>
+                </div>
+                
+                <button id="createRoomBtn" class="btn-primary">Создать новую комнату</button>
+            </div>
+        </div>
+
+        <div id="callScreen" class="screen">
+            <div class="video-container">
+                <video id="remoteVideo" autoplay playsinline></video>
+                <video id="localVideo" autoplay playsinline muted></video>
+                
+                <div class="video-overlay">
+                    <div class="status-container">
+                        <div class="connection-status">
+                            <span class="status-indicator"></span>
+                            <span id="connectionStatus">Подключение...</span>
+                        </div>
+                        
+                        <div class="room-info glass-pill">
+                            <span>Комната:</span>
+                            <span id="currentRoom"></span>
+                            <button id="copyLinkBtn" class="icon-btn" title="Скопировать ссылку">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="controls glass-card">
+                <button id="toggleVideoBtn" class="control-btn" title="Видео">
+                    <svg class="icon-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 7l-7 5 7 5V7z"/>
+                        <rect x="1" y="5" width="15" height="14" rx="2"/>
+                    </svg>
+                    <svg class="icon-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M16 16v1a2 2 0 01-2 2H3a2 2 0 01-2-2V7a2 2 0 012-2h2m5.66 0H14a2 2 0 012 2v3.34l1 1L23 7v10"/>
+                        <line x1="1" y1="1" x2="23" y2="23"/>
+                    </svg>
+                </button>
+
+                <button id="toggleAudioBtn" class="control-btn" title="Микрофон">
+                    <svg class="icon-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+                        <path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/>
+                    </svg>
+                    <svg class="icon-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="1" y1="1" x2="23" y2="23"/>
+                        <path d="M9 9v3a3 3 0 005.12 2.12M15 9.34V4a3 3 0 00-5.94-.6"/>
+                        <path d="M17 16.95A7 7 0 015 12v-2m14 0v2a7 7 0 01-.11 1.23"/>
+                        <line x1="12" y1="19" x2="12" y2="23"/>
+                        <line x1="8" y1="23" x2="16" y2="23"/>
+                    </svg>
+                </button>
+
+                <button id="shareScreenBtn" class="control-btn" title="Экран">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="3" width="20" height="14" rx="2"/>
+                        <line x1="8" y1="21" x2="16" y2="21"/>
+                        <line x1="12" y1="17" x2="12" y2="21"/>
+                    </svg>
+                </button>
+
+                <button id="hangupBtn" class="control-btn danger" title="Завершить">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 21l18-18M3 3l18 18"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="notification" class="notification"></div>
+    
+    <div id="infoModal" class="info-modal">
+        <div class="info-modal-content glass-card">
+            <button class="close-btn" id="closeModal">×</button>
+            <h2>Полная анонимность</h2>
+            <div class="info-text">
+                <p><strong>Peer-to-peer соединение:</strong></p>
+                <p>Все медиа данные передаются напрямую между участниками через WebRTC. Сервер не видит и не имеет доступа к вашему видео или аудио.</p>
+                
+                <p><strong>Без сохранения данных:</strong></p>
+                <p>Никакие данные не записываются на диск. Вся информация хранится в оперативной памяти и автоматически удаляется после отключения.</p>
+                
+                <p><strong>End-to-end шифрование:</strong></p>
+                <p>WebRTC использует встроенное шифрование DTLS и SRTP. Данные зашифрованы от устройства к устройству.</p>
+                
+                <p><strong>Без отпечатков:</strong></p>
+                <p>Нет cookies, аналитики, tracking скриптов или сохранения IP адресов. Комнаты существуют только в памяти сервера.</p>
+                
+                <p><strong>Минимальный signaling:</strong></p>
+                <p>Сервер используется только для установки начального соединения (обмен SDP и ICE кандидатами). После подключения сервер не участвует в передаче.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
+
