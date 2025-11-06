@@ -248,6 +248,10 @@ class SecureCall {
         this.currentRoom = document.getElementById('currentRoom');
         this.connectionStatus = document.getElementById('connectionStatus');
         this.notification = document.getElementById('notification');
+        
+        this.controls = document.querySelector('.controls');
+        this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        this.controlsTimeout = null;
     }
     
     attachEventListeners() {
@@ -284,6 +288,48 @@ class SecureCall {
         }
         
         document.addEventListener('contextmenu', e => e.preventDefault());
+        
+        if (this.isMobile) {
+            this.initializeMobileControls();
+        }
+    }
+    
+    initializeMobileControls() {
+        const videoContainer = document.querySelector('.video-container');
+        
+        videoContainer.addEventListener('touchstart', (e) => {
+            if (e.target === videoContainer || e.target.tagName === 'VIDEO') {
+                this.toggleMobileControls();
+            }
+        });
+        
+        this.hideMobileControls();
+    }
+    
+    toggleMobileControls() {
+        if (this.controls.classList.contains('hidden')) {
+            this.showMobileControls();
+        } else {
+            this.hideMobileControls();
+        }
+    }
+    
+    showMobileControls() {
+        this.controls.classList.remove('hidden');
+        
+        if (this.controlsTimeout) {
+            clearTimeout(this.controlsTimeout);
+        }
+        
+        this.controlsTimeout = setTimeout(() => {
+            this.hideMobileControls();
+        }, 4000);
+    }
+    
+    hideMobileControls() {
+        if (this.isMobile) {
+            this.controls.classList.add('hidden');
+        }
     }
     
     generateRoomId() {
@@ -295,20 +341,23 @@ class SecureCall {
         this.roomId = roomId;
         this.currentRoom.textContent = roomId;
         
+        console.log('Creating room with ID:', roomId);
+        
         try {
             await this.initializeMedia();
-            await this.initializePeer(roomId);
+            const peerId = await this.initializePeer(roomId);
+            console.log('Room created. Peer ID:', peerId, 'Room ID:', roomId);
             this.switchScreen('call');
             this.updateConnectionStatus('Ожидание собеседника...');
             this.showNotification('Комната создана! Поделитесь ссылкой');
         } catch (error) {
             console.error('Error creating room:', error);
-            this.showNotification('Ошибка доступа к камере/микрофону', 'error');
+            this.showNotification('Ошибка: ' + error.message, 'error');
         }
     }
     
     async joinRoom() {
-        const roomId = this.roomInput.value.trim();
+        const roomId = this.roomInput.value.trim().toUpperCase();
         
         if (!roomId) {
             this.showNotification('Пожалуйста, введите код комнаты', 'error');
@@ -318,45 +367,72 @@ class SecureCall {
         this.roomId = roomId;
         this.currentRoom.textContent = roomId;
         
+        console.log('Joining room:', roomId);
+        
         try {
             await this.initializeMedia();
             await this.initializePeer();
+            console.log('Calling peer:', roomId);
             this.connectToPeer(roomId);
             this.switchScreen('call');
-            this.updateConnectionStatus('Подключение...');
+            this.updateConnectionStatus('Подключение к комнате...');
         } catch (error) {
             console.error('Error joining room:', error);
-            this.showNotification('Ошибка доступа к камере/микрофону', 'error');
+            this.showNotification('Ошибка: ' + error.message, 'error');
         }
     }
     
     async initializeMedia() {
+        console.log('Checking available devices...');
+        
         try {
-            this.localStream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    width: { ideal: 1920 },
-                    height: { ideal: 1080 },
-                    facingMode: 'user'
-                },
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true
-                }
-            });
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(d => d.kind === 'videoinput');
+            const audioDevices = devices.filter(d => d.kind === 'audioinput');
             
+            console.log('Video devices:', videoDevices.length);
+            console.log('Audio devices:', audioDevices.length);
+            
+            if (videoDevices.length === 0 && audioDevices.length === 0) {
+                throw new Error('Камера и микрофон не найдены. Проверьте подключение устройств.');
+            }
+            
+            const constraints = {};
+            
+            if (videoDevices.length > 0) {
+                constraints.video = true;
+            } else {
+                console.warn('No video devices found, using audio only');
+                constraints.video = false;
+            }
+            
+            if (audioDevices.length > 0) {
+                constraints.audio = true;
+            } else {
+                console.warn('No audio devices found, using video only');
+                constraints.audio = false;
+            }
+            
+            this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
             this.localVideo.srcObject = this.localStream;
+            
+            console.log('Media stream initialized successfully');
+            
         } catch (error) {
             console.error('Error accessing media devices:', error);
-            throw error;
+            throw new Error(`Ошибка: ${error.message}. Проверьте:\n1. Камера/микрофон подключены\n2. Разрешения даны в браузере\n3. Устройства не заняты другой программой`);
         }
     }
     
     async initializePeer(peerId = null) {
         return new Promise((resolve, reject) => {
-            const config = peerId ? { id: peerId } : {};
+            if (peerId) {
+                console.log('Creating peer with custom ID:', peerId);
+            } else {
+                console.log('Creating peer with random ID');
+            }
             
-            this.peer = new Peer(config, {
+            this.peer = new Peer(peerId, {
                 host: '0.peerjs.com',
                 port: 443,
                 path: '/',
@@ -370,57 +446,85 @@ class SecureCall {
             });
             
             this.peer.on('open', (id) => {
-                console.log('Peer ID:', id);
+                console.log('Peer ID opened:', id);
+                if (peerId && id !== peerId) {
+                    console.warn('Peer ID mismatch! Requested:', peerId, 'Got:', id);
+                }
                 resolve(id);
             });
             
             this.peer.on('call', (call) => {
+                console.log('Incoming call received');
                 this.updateConnectionStatus('Входящий звонок...');
+                
+                if (!this.localStream) {
+                    console.error('No local stream available');
+                    return;
+                }
+                
+                console.log('Answering call with local stream');
                 call.answer(this.localStream);
                 this.currentCall = call;
                 
                 call.on('stream', (remoteStream) => {
+                    console.log('Received remote stream from caller');
                     this.remoteVideo.srcObject = remoteStream;
                     this.remoteStream = remoteStream;
                     this.updateConnectionStatus('Подключено', true);
                 });
                 
                 call.on('close', () => {
+                    console.log('Call closed');
                     this.handlePeerLeft();
+                });
+                
+                call.on('error', (error) => {
+                    console.error('Incoming call error:', error);
                 });
             });
             
             this.peer.on('error', (error) => {
                 console.error('Peer error:', error);
-                this.showNotification('Ошибка соединения', 'error');
                 reject(error);
-            });
-            
-            this.peer.on('disconnected', () => {
-                this.updateConnectionStatus('Отключено');
             });
         });
     }
     
     connectToPeer(peerId) {
         if (!this.peer) {
+            console.error('Peer not initialized');
             this.showNotification('Ошибка инициализации', 'error');
             return;
         }
         
+        console.log('Attempting to call peer:', peerId);
         this.updateConnectionStatus('Звоним...');
         
         const call = this.peer.call(peerId, this.localStream);
+        
+        if (!call) {
+            console.error('Failed to create call');
+            this.showNotification('Не удалось позвонить', 'error');
+            return;
+        }
+        
         this.currentCall = call;
         
         call.on('stream', (remoteStream) => {
+            console.log('Received remote stream');
             this.remoteVideo.srcObject = remoteStream;
             this.remoteStream = remoteStream;
             this.updateConnectionStatus('Подключено', true);
         });
         
         call.on('close', () => {
+            console.log('Call closed');
             this.handlePeerLeft();
+        });
+        
+        call.on('error', (error) => {
+            console.error('Call error:', error);
+            this.showNotification('Ошибка соединения: ' + error.message, 'error');
         });
     }
     
@@ -441,6 +545,9 @@ class SecureCall {
                 track.enabled = this.videoEnabled;
             });
             this.toggleVideoBtn.classList.toggle('disabled', !this.videoEnabled);
+            if (this.isMobile) {
+                this.showMobileControls();
+            }
         }
     }
     
@@ -451,6 +558,9 @@ class SecureCall {
                 track.enabled = this.audioEnabled;
             });
             this.toggleAudioBtn.classList.toggle('disabled', !this.audioEnabled);
+            if (this.isMobile) {
+                this.showMobileControls();
+            }
         }
     }
     
@@ -554,6 +664,9 @@ class SecureCall {
             this.welcomeScreen.classList.add('active');
         } else if (screen === 'call') {
             this.callScreen.classList.add('active');
+            if (this.isMobile) {
+                setTimeout(() => this.hideMobileControls(), 100);
+            }
         }
     }
     
